@@ -21,5 +21,5 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:${{ github.ref }}
+            ghcr.io/matteojoliveau/apicurio-sync:${{ github.sha }}
+            ghcr.io/matteojoliveau/apicurio-sync:${{ github.ref }}
