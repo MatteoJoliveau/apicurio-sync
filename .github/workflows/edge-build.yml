@@ -45,4 +45,3 @@ jobs:
           push: true
           tags: |
             ghcr.io/matteojoliveau/apicurio-sync:${{ github.sha }}
-            ghcr.io/matteojoliveau/apicurio-sync:${{ github.ref }}
