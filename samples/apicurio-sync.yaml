@@ -1,0 +1,14 @@
+url: http://localhost:8080
+
+push:
+  - group: example
+    artifact: push
+    path: proto/example/push.proto
+    type: CIAO
+
+pull:
+  - group: example
+    artifact: push
+    path: proto/example/pull.proto
+    version: 1
+

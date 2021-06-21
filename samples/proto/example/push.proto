@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package apicurio.example.push;
+
+// A message pushed from a local directory to the registry
+message Push {
+  string blank = 1;
+}

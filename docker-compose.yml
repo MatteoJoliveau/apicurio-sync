@@ -1,0 +1,6 @@
+version: "3"
+services:
+    registry:
+        image: quay.io/apicurio/apicurio-registry-mem:2.0.x-release
+        ports:
+            - "8080:8080"
