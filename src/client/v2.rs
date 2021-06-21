@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::error::Error;
 use crate::provider;
-use crate::provider::{ArtifactType, Provider};
+use crate::provider::{ArtifactType, Provider, PushArtifactMetadata};
 
 /// Client for Apicurio Registry API v2
 /// https://www.apicur.io/registry/docs/apicurio-registry/2.0.1.Final/assets-attachments/registry-rest-api.htm
@@ -61,13 +61,23 @@ impl Provider for ClientV2 {
         Ok(body.to_vec())
     }
 
-    async fn push_artifact(&self, group_id: &str, artifact_id: &str, artifact_type: Option<ArtifactType>, content: Vec<u8>) -> Result<(), Error> {
-        let req_builder = self.client.post(self.base_url.join(&format!("groups/{}/artifacts", group_id)).unwrap());
-        let req_builder = if let Some(typ) = artifact_type { req_builder.header("X-Registry-ArtifactType", typ.to_string()) } else { req_builder };
+    async fn push_artifact(&self, metadata: PushArtifactMetadata, content: Vec<u8>) -> Result<(), Error> {
+        let req_builder = self.client.post(self.base_url.join(&format!("groups/{}/artifacts", metadata.group_id)).unwrap());
+        let req_builder = if let Some(typ) = metadata.artifact_type { req_builder.header("X-Registry-ArtifactType", typ.to_string()) } else { req_builder };
         req_builder
-            .header("X-Registry-ArtifactId", artifact_id)
+            .header("X-Registry-ArtifactId", &metadata.artifact_id)
             .query(&[("ifExists", "RETURN_OR_UPDATE")])
             .body(content)
+            .send().await?
+            .error_for_status()?;
+
+        self.client.put(self.base_url.join(&format!("groups/{}/artifacts/{}/meta", metadata.group_id, metadata.artifact_id)).unwrap())
+            .json(&UpdateArtifactMetadataBody {
+                name: metadata.name,
+                description: metadata.description,
+                labels: metadata.labels,
+                properties: metadata.properties,
+            })
             .send().await?
             .error_for_status()?;
         Ok(())
@@ -177,4 +187,13 @@ impl Into<provider::ArtifactVersionMetadata> for ArtifactVersionMetadata {
             properties: self.properties,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateArtifactMetadataBody {
+    name: Option<String>,
+    description: Option<String>,
+    labels: Option<Vec<String>>,
+    properties: Option<HashMap<String, String>>,
 }

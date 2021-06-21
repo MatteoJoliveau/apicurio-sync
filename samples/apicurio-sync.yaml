@@ -3,12 +3,19 @@ url: http://localhost:8080
 push:
   - group: example
     artifact: push
+    name: Push example
+    description: An example Protobuf schema to demonstrate the push capabilities of apicurio-sync
     path: proto/example/push.proto
     type: PROTOBUF
+    labels:
+      - example
+    properties:
+      example.com/hello: world
 
-pull:
-  - group: example
-    artifact: push
-    path: proto/example/pull.proto
-    version: 1
+# Uncomment if you want to try the pull mechanism
+#pull:
+#  - group: example
+#    artifact: push
+#    path: proto/example/pull.proto
+#    version: 1
 

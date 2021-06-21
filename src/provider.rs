@@ -12,7 +12,7 @@ pub trait Provider {
     async fn fetch_artifact_metadata(&self, group_id: &str, artifact_id: &str) -> Result<ArtifactMetadata, Error>;
     async fn fetch_artifact_version_metadata(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<ArtifactVersionMetadata, Error>;
     async fn fetch_artifact_by_global_id(&self, global_id: u64) -> Result<Vec<u8>, Error>;
-    async fn push_artifact(&self, group_id: &str, artifact_id: &str, artifact_type: Option<ArtifactType>, content: Vec<u8>) -> Result<(), Error>;
+    async fn push_artifact(&self, metadata: PushArtifactMetadata, content: Vec<u8>) -> Result<(), Error>;
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -73,6 +73,17 @@ pub struct ArtifactMetadata {
 }
 
 #[derive(Debug)]
+pub struct PushArtifactMetadata {
+    pub group_id: String,
+    pub artifact_id: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub artifact_type: Option<ArtifactType>,
+    pub labels: Option<Vec<String>>,
+    pub properties: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug)]
 pub struct ArtifactVersionMetadata {
     pub group_id: String,
     pub id: String,
@@ -108,7 +119,7 @@ impl Provider for NoopProvider {
         unimplemented!()
     }
 
-    async fn push_artifact(&self, _group_id: &str, _artifact_id: &str, _artifact_type: Option<ArtifactType>, _content: Vec<u8>) -> Result<(), Error> {
+    async fn push_artifact(&self, _metadata: PushArtifactMetadata, _content: Vec<u8>) -> Result<(), Error> {
         unimplemented!()
     }
 }

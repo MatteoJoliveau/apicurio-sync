@@ -66,6 +66,10 @@ impl LockFile {
                 group: artifact.group.clone(),
                 artifact: artifact.artifact.clone(),
                 artifact_type: artifact.artifact_type.clone(),
+                name: artifact.name.clone(),
+                description: artifact.description.clone(),
+                labels: artifact.labels.clone(),
+                properties: artifact.properties.clone(),
             };
 
             self.push.insert(artifact.path.clone(), locked);
@@ -122,6 +126,10 @@ pub struct PushArtifactRef {
     pub group: String,
     pub artifact: String,
     pub artifact_type: Option<ArtifactType>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub labels: Option<Vec<String>>,
+    pub properties: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

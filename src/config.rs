@@ -5,6 +5,7 @@ use tokio::fs::{File, OpenOptions};
 use url::Url;
 use crate::provider::ArtifactType;
 use tokio::io::AsyncWriteExt;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -52,6 +53,10 @@ pub struct PushArtifactRef {
     pub path: PathBuf,
     #[serde(rename = "type")]
     pub artifact_type: Option<ArtifactType>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub labels: Option<Vec<String>>,
+    pub properties: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

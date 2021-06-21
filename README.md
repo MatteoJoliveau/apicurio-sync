@@ -41,8 +41,17 @@ url: http://localhost:8080          # Base URL of the registry
 push:                               # Artifacts that are uploaded from the local folder to the registry
   - group: example
     artifact: push
+    name: Push example              # Optional
+    description: |                  # Optional
+      An example Protobuf schema 
+      to demonstrate the push 
+      capabilities of apicurio-sync
     path: proto/example/push.proto
     type: PROTOBUF
+    labels:                         # Optional
+      - example
+    properties:                     # Optional
+      example.com/hello: world
 
 pull:                               # Artifacts that are downloaded from the registry to the local folder
   - group: example
