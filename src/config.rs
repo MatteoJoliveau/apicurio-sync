@@ -1,15 +1,14 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use tokio::fs::{File, OpenOptions};
-use url::Url;
-use crate::provider::ArtifactType;
 use tokio::io::AsyncWriteExt;
-use std::collections::HashMap;
+
+use crate::provider::ArtifactType;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
-    pub url: Url,
     #[serde(default)]
     pub push: Vec<PushArtifactRef>,
     #[serde(default)]
@@ -38,7 +37,6 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            url: "https://example.com".parse().unwrap(),
             push: Vec::new(),
             pull: Vec::new(),
             path: PathBuf::new(),
