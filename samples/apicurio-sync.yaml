@@ -4,7 +4,7 @@ push:
   - group: example
     artifact: push
     path: proto/example/push.proto
-    type: CIAO
+    type: PROTOBUF
 
 pull:
   - group: example
