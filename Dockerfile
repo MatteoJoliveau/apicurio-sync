@@ -16,8 +16,9 @@ WORKDIR /app
 COPY . .
 COPY --from=cacher /app/target target
 COPY --from=cacher $CARGO_HOME $CARGO_HOME
+RUN ls
 RUN cargo build --release
 
-FROM gcr.io/distroless/cc:debug
-COPY --from=build /app/target/release/apicurio-sync /usr/local/bin
+FROM public.ecr.aws/bitnami/minideb:buster
+COPY --from=build /app/target/release/apicurio-sync /usr/local/bin/
 ENTRYPOINT ["/usr/local/bin/apicurio-sync"]

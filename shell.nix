@@ -2,8 +2,5 @@ let
   pkgs = import <nixpkgs> { };
 in
 pkgs.mkShell {
-  buildInputs = with pkgs; [
-    pkgconfig
-    openssl.dev
-  ];
+  buildInputs = with pkgs; [];
 }
