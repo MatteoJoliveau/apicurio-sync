@@ -34,9 +34,10 @@ impl Context {
         };
 
         let content: ContextFile = serde_json::from_reader(file.into_std().await)?;
-        if let Some(current_context) = context_name.or(content.current_context).as_ref() {
-            let RegistryContext { url, .. } = content.contexts.get(current_context).ok_or_else(|| Error::setup(format!("No context found for name '{}'", current_context)))?;
-            Ok(Some(Context::new(current_context.clone(), url.clone())))
+        if let Some((name, RegistryContext { url, .. })) = context_name.or(content.current_context.clone()).as_ref()
+            .and_then(|name| content.contexts.get(name)
+                .map(|ctx| (name, ctx))) {
+            Ok(Some(Context::new(name.clone(), url.clone())))
         } else {
             Ok(None)
         }

@@ -168,7 +168,9 @@ async fn context<P: AsRef<Path>, Fut: Future<Output=Result<Context, Error>>, Fun
         },
         ContextCommand::Set { context_name, url, current } => {
             let path = ctx_path.as_ref();
-            let mut ctx = Context::try_new(path, Some(context_name.clone())).await?;
+            let mut ctx = Context::from_file(path, Some(context_name.clone())).await?
+                .or_else(|| url.clone().map(|url| Context::new(context_name.clone(), url)))
+                .ok_or_else(|| Error::setup("URL is required to create a new context"))?;
             if let Some(url) = url {
                 ctx.registry_url = url;
             }
