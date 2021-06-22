@@ -36,14 +36,62 @@ SUBCOMMANDS:
 
 ## Usage
 
+### Contexts
+
+Apicurio Sync uses a context file (located in the default user config directory, e.g. `$HOME/.config/apicurio-sync/context.json` on Linux),
+to keep track of registries and their authentication credentials. Contexts are decoupled from projects and completely local, 
+so that the same project can be managed in the scope on multiple registries without changing the codebase, for example
+if you have a staging and a production registry.
+
+All operations happen in the scope of a specific context, called the "current context".
+To manipulate the context configuration, use the `context` subcommand.
+
+#### Examples
+
+Create a context with a given URL
+
+```shell
+$ apicurio-sync context set production --url https://registry.example.com --current
+Updated context production
+```
+
+Print the current context
+
+```shell
+$ apicurio-sync context current
+production
+```
+
+Change the current context
+
+```shell
+$ apicurio-sync context set local --current
+Updated context local
+```
+
+Print the entire context configuration
+
+```shell
+$ apicurio-sync context show
+{
+  "current_context": "local",
+  "contexts": {
+    "local": {
+      "url": "http://localhost:8080/"
+    "production": {
+      "url": "https://registry.example.com/"
+    }
+  }
+}
+```
+
+
 ### Sync
 
 Apicurio Sync uses a declarative approach by defining the artifacts it should manage in a YAML configuration file.
 See [samples/apicurio-sync.yaml](samples/apicurio-sync.yaml) for a working example.
 
 ```yaml
-url: http://localhost:8080          # Base URL of the registry
-
 push:                               # Artifacts that are uploaded from the local folder to the registry
   - group: example
     artifact: push
@@ -53,7 +101,7 @@ push:                               # Artifacts that are uploaded from the local
       to demonstrate the push 
       capabilities of apicurio-sync
     path: proto/example/push.proto
-    type: PROTOBUF
+    type: PROTOBUF                  # Optional, if omitted the registry will try to autodetect it from the uploaded content
     labels:                         # Optional
       - example
     properties:                     # Optional
