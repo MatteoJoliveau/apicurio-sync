@@ -9,7 +9,7 @@ use crate::provider::{Provider, PushArtifactMetadata};
 
 pub async fn pull_artifacts(provider: &impl Provider, plan: &Plan, workdir: &Path) -> Result<(), Error> {
     for (path, artifact) in &plan.pull {
-        let content = provider.fetch_artifact_by_global_id(artifact.global_id.unwrap()).await?;
+        let content = provider.fetch_artifact_version(artifact.group.as_ref().expect("artifact group"), artifact.artifact.as_ref().expect("artifact id"), artifact.version.as_ref().expect("artifact version")).await?;
         let destination = workdir.join(path);
         tokio::fs::create_dir_all(&destination.parent().unwrap()).await?;
         let mut file = File::create(&destination).await?;

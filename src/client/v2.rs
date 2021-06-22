@@ -54,8 +54,8 @@ impl Provider for ClientV2 {
             .map_err(Into::into)
     }
 
-    async fn fetch_artifact_by_global_id(&self, global_id: u64) -> Result<Vec<u8>, Error> {
-        let body = self.client.get(self.base_url.join(&format!("ids/globalIds/{}", global_id)).unwrap()).send().await?
+    async fn fetch_artifact_version(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<Vec<u8>, Error> {
+        let body = self.client.get(self.base_url.join(&format!("groups/{}/artifacts/{}/versions/{}", group_id, artifact_id, version)).unwrap()).send().await?
             .error_for_status()?
             .bytes().await?;
         Ok(body.to_vec())

@@ -11,9 +11,8 @@ push:
       example.com/hello: world
 
 # Uncomment if you want to try the pull mechanism
-#pull:
-#  - group: example
-#    artifact: push
-#    path: proto/example/pull.proto
-#    version: 1
-
+pull:
+  - group: example
+    artifact: push
+    path: proto/example/pull.proto
+    version: 1

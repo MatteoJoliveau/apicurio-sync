@@ -15,6 +15,8 @@ use url::Url;
 use crate::context::Context;
 use crate::plan::Plan;
 use std::future::Future;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 
 mod client;
 mod config;
@@ -61,6 +63,16 @@ enum ContextCommand {
     Current,
     #[structopt(long_about = "Init context file")]
     Init,
+    #[structopt(long_about = "Set context properties")]
+    Set {
+        #[structopt(short, long, help = "The registry URL to set")]
+        url: Option<Url>,
+        #[structopt(short, long, help = "Set this context as current")]
+        current: bool,
+        context_name: String,
+    },
+    #[structopt(long_about = "Print all context configurations")]
+    Show,
 }
 
 arg_enum! {
@@ -96,8 +108,6 @@ struct Opts {
     possible_values = & ApiVersion::variants(),
     global = true)]
     api_version: ApiVersion,
-    #[structopt(long = "url", default_value = "http://localhost:8080", env = "APICURIO_SYNC_REGISTRY_URL", global = true)]
-    url: Url,
     #[structopt(
     long = "cwd",
     help = "The working directory to use. Every operation will happen inside this directory. Defaults to the current directory.",
@@ -118,14 +128,14 @@ async fn run() -> Result<(), Error> {
     }
 
     let ctx_path = &opts.context;
-    let ctx_fn = |path| async move { Context::try_new(path).await };
+    let ctx_fn = |path| async move { Context::try_new(path, None).await };
     if let Some(Command::Context(cmd)) = opts.cmd {
         return context(cmd, ctx_path.as_path(), ctx_fn).await;
     }
 
     let ctx = ctx_fn(ctx_path).await?;
     let config = Config::load_from_file(cfg_file).await?;
-    let client = Client::new(opts.url.clone());
+    let client = Client::new(ctx.registry_url.clone());
     let client_v2 = client.v2();
     let mut lockfile = LockFile::try_load_for_config(&config, &client_v2).await?;
     let plan = Plan::new(ctx)
@@ -167,7 +177,28 @@ async fn context<P: AsRef<Path>, Fut: Future<Output=Result<Context, Error>>, Fun
             eprintln!("{}", ctx.context_name);
             Ok(())
         }
-        ContextCommand::Init => Context::write_empty_file(&ctx_path.as_ref().join("config.json")).await
+        ContextCommand::Init => {
+            Context::write_empty_file(ctx_path.as_ref()).await?;
+            eprintln!("Initialzed empty context file");
+            Ok(())
+        },
+        ContextCommand::Set { context_name, url, current } => {
+            let path = ctx_path.as_ref();
+            let mut ctx = Context::try_new(path, Some(context_name.clone())).await?;
+            if let Some(url) = url {
+                ctx.registry_url = url;
+            }
+            ctx.write(path, current).await?;
+            eprintln!("Updated context {}", context_name);
+            Ok(())
+        },
+        ContextCommand::Show => {
+            let mut file = File::open(ctx_path.as_ref()).await?;
+            let mut buf = String::new();
+            file.read_to_string(&mut buf).await?;
+            println!("{}", buf);
+            Ok(())
+        }
     }
 }
 

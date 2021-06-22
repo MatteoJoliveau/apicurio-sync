@@ -11,7 +11,7 @@ pub trait Provider {
     async fn system_info(&self) -> Result<SystemInfo, Error>;
     async fn fetch_artifact_metadata(&self, group_id: &str, artifact_id: &str) -> Result<ArtifactMetadata, Error>;
     async fn fetch_artifact_version_metadata(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<ArtifactVersionMetadata, Error>;
-    async fn fetch_artifact_by_global_id(&self, global_id: u64) -> Result<Vec<u8>, Error>;
+    async fn fetch_artifact_version(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<Vec<u8>, Error>;
     async fn push_artifact(&self, metadata: PushArtifactMetadata, content: Vec<u8>) -> Result<(), Error>;
 }
 
@@ -115,7 +115,7 @@ impl Provider for NoopProvider {
         unimplemented!()
     }
 
-    async fn fetch_artifact_by_global_id(&self, _global_id: u64) -> Result<Vec<u8>, Error> {
+    async fn fetch_artifact_version(&self, _group_id: &str, _artifact_id: &str, _version: &str) -> Result<Vec<u8>, Error> {
         unimplemented!()
     }
 

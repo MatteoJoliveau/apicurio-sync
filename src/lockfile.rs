@@ -7,11 +7,10 @@ use tokio::io::AsyncWriteExt;
 
 use crate::config::Config;
 use crate::error::Error;
-use crate::provider::{ArtifactType, Provider};
+use crate::provider::Provider;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LockFile {
-    pub push: HashMap<PathBuf, PushArtifactRef>,
     pub pull: HashMap<PathBuf, PullArtifactRef>,
     #[serde(skip)]
     path: PathBuf,
@@ -20,7 +19,6 @@ pub struct LockFile {
 impl LockFile {
     fn empty(path: PathBuf) -> Self {
         Self {
-            push: HashMap::new(),
             pull: HashMap::new(),
             path,
         }
@@ -52,29 +50,6 @@ impl LockFile {
     }
 
     async fn generate(&mut self, config: &Config, provider: &impl Provider, update: bool) -> Result<(), Error> {
-        let push = &config.push;
-        if push.is_empty() {
-            self.push = HashMap::new();
-        }
-
-        for artifact in push {
-            if !update && self.push.contains_key(&artifact.path) {
-                continue;
-            }
-
-            let locked = PushArtifactRef {
-                group: artifact.group.clone(),
-                artifact: artifact.artifact.clone(),
-                artifact_type: artifact.artifact_type.clone(),
-                name: artifact.name.clone(),
-                description: artifact.description.clone(),
-                labels: artifact.labels.clone(),
-                properties: artifact.properties.clone(),
-            };
-
-            self.push.insert(artifact.path.clone(), locked);
-        }
-
         let pull = &config.pull;
         if pull.is_empty() {
             self.pull = HashMap::new();
@@ -90,13 +65,15 @@ impl LockFile {
             let locked = if let Some(version) = &artifact.version {
                 let metadata = provider.fetch_artifact_version_metadata(&artifact.group, &artifact.artifact, version).await?;
                 PullArtifactRef {
-                    global_id: metadata.global_id,
+                    group: metadata.group_id,
+                    artifact: metadata.id,
                     version: metadata.version,
                 }
             } else {
                 let metadata = provider.fetch_artifact_metadata(&artifact.group, &artifact.artifact).await?;
                 PullArtifactRef {
-                    global_id: metadata.global_id,
+                    group: metadata.group_id,
+                    artifact: metadata.id,
                     version: metadata.version,
                 }
             };
@@ -116,18 +93,8 @@ impl LockFile {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PushArtifactRef {
+pub struct PullArtifactRef {
     pub group: String,
     pub artifact: String,
-    pub artifact_type: Option<ArtifactType>,
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub labels: Option<Vec<String>>,
-    pub properties: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PullArtifactRef {
-    pub global_id: u64,
     pub version: String,
 }

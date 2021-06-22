@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::context::Context;
 use crate::lockfile::LockFile;
-use crate::provider::{ArtifactType, PushArtifactMetadata};
+use crate::provider::ArtifactType;
 
 pub struct Plan {
     pub push: HashMap<PathBuf, PushArtifactRef>,
@@ -47,7 +47,8 @@ impl Plan {
     pub fn merge_with_lockfile(mut self, lockfile: &LockFile) -> Self {
         for (path, artifact) in &lockfile.pull {
             let mut pull_ref = self.pull.entry(path.clone()).or_insert_with(PullArtifactRef::default);
-            pull_ref.global_id = Some(artifact.global_id);
+            pull_ref.group = Some(artifact.group.clone());
+            pull_ref.artifact = Some(artifact.artifact.clone());
             pull_ref.version = Some(artifact.version.clone());
         }
         self
@@ -70,7 +71,6 @@ pub struct PushArtifactRef {
 pub struct PullArtifactRef {
     pub group: Option<String>,
     pub artifact: Option<String>,
-    pub global_id: Option<u64>,
     pub artifact_type: Option<ArtifactType>,
     pub version: Option<String>,
 }
