@@ -1,22 +1,21 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::path::{PathBuf, Path};
+use std::future::Future;
+use std::path::{Path, PathBuf};
 
-use clap::arg_enum;
 use structopt::StructOpt;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
+use url::Url;
 
 use crate::client::Client;
 use crate::config::Config;
+use crate::context::Context;
 use crate::error::Error;
 use crate::lockfile::LockFile;
-use crate::provider::{NoopProvider, Provider};
-use url::Url;
-use crate::context::Context;
 use crate::plan::Plan;
-use std::future::Future;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use crate::provider::{NoopProvider, Provider};
 
 mod client;
 mod config;
@@ -75,13 +74,6 @@ enum ContextCommand {
     Show,
 }
 
-arg_enum! {
-    #[derive(PartialEq, Debug)]
-    enum ApiVersion {
-        V2,
-    }
-}
-
 #[derive(Debug, StructOpt)]
 struct Opts {
     #[structopt(
@@ -101,13 +93,6 @@ struct Opts {
     parse(from_os_str),
     global = true)]
     context: PathBuf,
-    #[structopt(long = "api-version",
-    default_value = "v2",
-    help = "The Apicurio API to use",
-    case_insensitive = true,
-    possible_values = & ApiVersion::variants(),
-    global = true)]
-    api_version: ApiVersion,
     #[structopt(
     long = "cwd",
     help = "The working directory to use. Every operation will happen inside this directory. Defaults to the current directory.",
@@ -135,8 +120,7 @@ async fn run() -> Result<(), Error> {
 
     let ctx = ctx_fn(ctx_path).await?;
     let config = Config::load_from_file(cfg_file).await?;
-    let client = Client::new(ctx.registry_url.clone());
-    let client_v2 = client.v2();
+    let client_v2 = Client::new(ctx.registry_url.clone()).v2();
     let mut lockfile = LockFile::try_load_for_config(&config, &client_v2).await?;
     let plan = Plan::new(ctx)
         .merge_with_config(&config)

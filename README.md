@@ -6,6 +6,8 @@ a local folder.
 ## Synopsis
 
 ```
+$ apicurio-sync --help
+
 apicurio-sync 0.1.0
 
 USAGE:
@@ -17,15 +19,19 @@ FLAGS:
 
 OPTIONS:
         --api-version <api-version>    The Apicurio API to use [default: v2]  [possible values: V2]
-    -f, --config-file <config>         The configuration file to use [default: apicurio-sync.yaml]
+    -f, --config-file <config>         The configuration file to use [env: APICURIO_SYNC_CONFIG_FILE=]  [default:
+                                       apicurio-sync.yaml]
+        --context-file <context>       The context file to use [env: APICURIO_SYNC_CONTEXT_FILE=]  [default:
+                                       /home/matteo/.config/apicurio-sync/context.json]
         --cwd <cwd>                    The working directory to use. Every operation will happen inside this directory.
-                                       Defaults to the current directory.
+                                       Defaults to the current directory. [env: APICURIO_SYNC_WORKDIR=]
 
 SUBCOMMANDS:
-    help      Prints this message or the help of the given subcommand(s)
-    init      Initializes an empty config file
-    sync      Synchronizes artifacts with the registry
-    update    Updates the project lockfile with the registry without updating the artifacts themselves
+    context    Work with context
+    help       Prints this message or the help of the given subcommand(s)
+    init       Initializes an empty config file
+    sync       Synchronizes artifacts with the registry
+    update     Updates the project lockfile with the registry without updating the artifacts themselves
 ```
 
 ## Usage
