@@ -46,6 +46,20 @@ if you have a staging and a production registry.
 All operations happen in the scope of a specific context, called the "current context".
 To manipulate the context configuration, use the `context` subcommand.
 
+Context information can also be provided via environment variables, making it easier to configure in CI pipelines.
+
+```dotenv
+# The context name. Optional and only for display when running `apicurio-sync context current`.
+# If not set, the registry URL is used as the context name.
+APICURIO_SYNC_CONTEXT_NAME
+
+# URL of the registry to use
+APICURIO_SYNC_REGISTRY_URL
+```
+
+Beware that, when using environment variables with no context file configured, `apicurio-sync context show` will throw a
+`No such file or directory` error.
+
 #### Examples
 
 Create a context with a given URL
