@@ -90,20 +90,14 @@ impl LockFile {
             let locked = if let Some(version) = &artifact.version {
                 let metadata = provider.fetch_artifact_version_metadata(&artifact.group, &artifact.artifact, version).await?;
                 PullArtifactRef {
-                    group: metadata.group_id,
-                    artifact: metadata.id,
                     global_id: metadata.global_id,
                     version: metadata.version,
-                    artifact_type: metadata.artifact_type,
                 }
             } else {
                 let metadata = provider.fetch_artifact_metadata(&artifact.group, &artifact.artifact).await?;
                 PullArtifactRef {
-                    group: metadata.group_id,
-                    artifact: metadata.id,
                     global_id: metadata.global_id,
                     version: metadata.version,
-                    artifact_type: metadata.artifact_type,
                 }
             };
             self.pull.insert(artifact.path.clone(), locked);
@@ -134,9 +128,6 @@ pub struct PushArtifactRef {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PullArtifactRef {
-    pub group: String,
-    pub artifact: String,
     pub global_id: u64,
-    pub artifact_type: ArtifactType,
     pub version: String,
 }
