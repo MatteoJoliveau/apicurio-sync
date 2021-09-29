@@ -84,6 +84,7 @@ enum ContextCommand {
 
 #[derive(Debug, StructOpt)]
 enum LoginCommand {
+    #[structopt(long_about = "Authenticate against an OpenID Connect provider")]
     Oidc {
         #[structopt(long, help = "The OIDC Client ID to use")]
         client_id: String,
@@ -104,6 +105,7 @@ enum LoginCommand {
         port: u16,
         issuer_url: String,
     },
+    #[structopt(long_about = "Authenticate using a simple username/password pair")]
     Basic {
         #[structopt(short, long, help = "Username")]
         username: String,

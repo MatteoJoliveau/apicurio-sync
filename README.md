@@ -11,24 +11,34 @@ $ apicurio-sync --help
 apicurio-sync 0.1.0
 
 USAGE:
-    apicurio-sync [OPTIONS] [SUBCOMMAND]
+    apicurio-sync [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+    -d, --debug      
+            Whether to print debug logs or not
+
+    -h, --help       
+            Prints help information
+
+    -V, --version    
+            Prints version information
+
 
 OPTIONS:
-        --api-version <api-version>    The Apicurio API to use [default: v2]  [possible values: V2]
-    -f, --config-file <config>         The configuration file to use [env: APICURIO_SYNC_CONFIG_FILE=]  [default:
-                                       apicurio-sync.yaml]
-        --context-file <context>       The context file to use [env: APICURIO_SYNC_CONTEXT_FILE=]  [default:
-                                       /home/matteo/.config/apicurio-sync/context.json]
-        --cwd <cwd>                    The working directory to use. Every operation will happen inside this directory.
-                                       Defaults to the current directory. [env: APICURIO_SYNC_WORKDIR=]
+    -f, --config-file <config>      
+            The configuration file to use [env: APICURIO_SYNC_CONFIG_FILE=]  [default: apicurio-sync.yaml]
+
+        --context-file <context>    
+            The context file to use [env: APICURIO_SYNC_CONTEXT_FILE=]  [default: /home/matteo/.config/apicurio-
+            sync/context.json]
+        --cwd <cwd>                 
+            The working directory to use. Every operation will happen inside this directory. Defaults to the current
+            directory. [env: APICURIO_SYNC_WORKDIR=]
 
 SUBCOMMANDS:
     context    Work with context
     help       Prints this message or the help of the given subcommand(s)
+    info       Print registry information for debugging purposes
     init       Initializes an empty config file
     sync       Synchronizes artifacts with the registry
     update     Updates the project lockfile with the registry without updating the artifacts themselves
@@ -60,9 +70,37 @@ APICURIO_SYNC_REGISTRY_URL
 Beware that, when using environment variables with no context file configured, `apicurio-sync context show` will throw a
 `No such file or directory` error.
 
+#### Authentication
+
+Apicurio Sync supports two different authentication methods (in addition to simply not using any authentication mechanism):
+- Basic auth, with a simple username/password pair
+- OpenID Connection, using the [authorization code flow](https://auth0.com/docs/authorization/flows/authorization-code-flow)
+
+**WARNING**: authentication via envars is not yet supported, but planned.
+
+To authenticate, invoke the login command for the desired method:
+
+Using basic auth
+```bash
+echo "my-secret-password" | apicurio-sync context login basic --username "my-user" --password-stdin
+
+# Password is optional
+apicurio-sync context login basic --username "my-user"
+```
+
+Using OIDC
+```bash
+apicurio-sync context login oidc https://auth.example.com --client-id my-client-id-for-apicurio-syn
+
+# This will open the provider login page in your default browser
+```
+
+**WARNING**: authentication credentials (e.g. password, OIDC tokens) are stored in plain text in the `context.json` file
+and are visible when running `apicurio-sync context show`. PROTECT THIS FILE.
+
 #### Examples
 
-Create a context with a given URL
+Create a new context or update an existing with a given URL, setting it as the currently active context
 
 ```shell
 $ apicurio-sync context set production --url https://registry.example.com --current
@@ -76,7 +114,7 @@ $ apicurio-sync context current
 production
 ```
 
-Change the current context
+Change the current context to a different context
 
 ```shell
 $ apicurio-sync context set local --current
@@ -91,9 +129,17 @@ $ apicurio-sync context show
   "current_context": "local",
   "contexts": {
     "local": {
-      "url": "http://localhost:8080/"
+      "url": "http://localhost:8080/",
+      "auth": {
+        "type": "basic",
+        "username": "my-user",
+        "password": "my-secret-password"
+      }
     "production": {
-      "url": "https://registry.example.com/"
+      "url": "https://registry.example.com/",
+      "auth": {
+        "type": "none"
+      }
     }
   }
 }
