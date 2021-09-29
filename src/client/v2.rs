@@ -1,17 +1,15 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use crate::auth::AuthProvider;
 use async_trait::async_trait;
 use http::header;
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::{context, provider};
 use crate::context::Auth;
 use crate::error::Error;
 use crate::provider::{ArtifactType, Provider, PushArtifactMetadata};
-use crate::{context, provider};
 
 /// Client for Apicurio Registry API v2
 /// https://www.apicur.io/registry/docs/apicurio-registry/2.0.1.Final/assets-attachments/registry-rest-api.htm

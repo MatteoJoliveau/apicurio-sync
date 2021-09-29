@@ -1,8 +1,7 @@
-use crate::auth::AuthProvider;
-use crate::client::v2::ClientV2;
 use reqwest::ClientBuilder;
-use std::sync::Arc;
 use url::Url;
+
+use crate::client::v2::ClientV2;
 
 mod v2;
 

@@ -5,14 +5,14 @@ use std::future::Future;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
-use crate::auth::basic::BasicAuthProvider;
-use crate::auth::oidc::OidcProvider;
-use crate::auth::AuthProvider;
 use structopt::StructOpt;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use url::Url;
 
+use crate::auth::AuthProvider;
+use crate::auth::basic::BasicAuthProvider;
+use crate::auth::oidc::OidcProvider;
 use crate::client::Client;
 use crate::config::Config;
 use crate::context::Context;

@@ -6,17 +6,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use http::StatusCode;
-use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
 use openidconnect::{
     AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope,
-    StandardErrorResponse,
+    RedirectUrl, RequestTokenError, Scope,
 };
+use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
 use serde::Deserialize;
-use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, RwLock};
-use url::Url;
-use warp::reply::Html;
+use tokio::sync::mpsc::Sender;
 use warp::{Filter, Reply};
 
 use crate::auth::AuthProvider;
@@ -146,7 +143,7 @@ fn with_shutdown_signal(
 async fn callback_handler(
     provider: Arc<RwLock<OidcProvider>>,
     tx: Sender<()>,
-    CallbackQuery { code, state }: CallbackQuery,
+    CallbackQuery { code, state: _state }: CallbackQuery,
 ) -> Result<impl Reply, warp::Rejection> {
     let mut provider = provider.write().await;
     let token_response = provider

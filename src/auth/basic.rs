@@ -1,7 +1,8 @@
+use async_trait::async_trait;
+
 use crate::auth::AuthProvider;
 use crate::context::{Auth, Context};
 use crate::error::Error;
-use async_trait::async_trait;
 
 pub struct BasicAuthProvider {
     username: String,
