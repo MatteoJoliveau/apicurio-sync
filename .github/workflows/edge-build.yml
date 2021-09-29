@@ -56,14 +56,14 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles(format('{0}{1}', github.workspace, '/Cargo.lock')) }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-        - name: Install Dependencies
-          run: |
-            apt-get update -y
-            apt-get install build-essential libssl-dev llvm-dev libclang-dev -y
-            rustup update
-        - name: Build
-          run: cargo build --release --all-features
-        - uses: 'actions/upload-artifact@v2'
-          with:
-            name: apicurio-sync-${{ runner.os }}
-            path: ${{ github.workspace }}/target/release/apicurio-sync
+      - name: Install Dependencies
+        run: |
+          apt-get update -y
+          apt-get install build-essential libssl-dev llvm-dev libclang-dev -y
+          rustup update
+      - name: Build
+        run: cargo build --release --all-features
+      - uses: 'actions/upload-artifact@v2'
+        with:
+          name: apicurio-sync-${{ runner.os }}
+          path: ${{ github.workspace }}/target/release/apicurio-sync
