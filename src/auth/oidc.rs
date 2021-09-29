@@ -4,7 +4,7 @@ use std::ops::Add;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Duration, Utc};
 use http::StatusCode;
 use openidconnect::{AuthorizationCode, ClientId, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope, StandardErrorResponse};
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
@@ -16,7 +16,7 @@ use warp::{Filter, Reply};
 use warp::reply::Html;
 
 use crate::auth::AuthProvider;
-use crate::context::Context;
+use crate::context::{Context, Auth};
 use crate::error::Error;
 
 #[derive(Debug, Clone)]
@@ -85,13 +85,13 @@ impl AuthProvider for OidcProvider {
 
         let this = this.read().await;
         let tokens = this.tokens.as_ref().unwrap();
-        ctx.set_auth_param("issuer_url", this.issuer_url.clone());
-        ctx.set_auth_param("client_id", this.client_id.clone());
-        ctx.set_auth_param("access_token", &tokens.access_token);
-        if let Some(refresh_token) = &tokens.refresh_token {
-            ctx.set_auth_param("refresh_token", refresh_token);
-        }
-        ctx.set_auth_param("expires_at", tokens.expires_at);
+        ctx.set_auth(Auth::Oidc {
+            issuer_url: this.issuer_url.clone(),
+            client_id: this.client_id.clone(),
+            access_token: tokens.access_token.clone(),
+            refresh_token: tokens.refresh_token.clone(),
+            expires_at: tokens.expires_at.clone(),
+        });
         Ok(ctx)
     }
 }

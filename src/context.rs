@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::path::Path;
+use chrono::{DateTime, Utc};
 
 use serde::{Deserialize, Serialize};
 use tokio::fs::{File, OpenOptions};
@@ -15,7 +16,7 @@ const REGISTRY_URL_ENVAR: &str = "APICURIO_SYNC_REGISTRY_URL";
 pub struct Context {
     pub context_name: String,
     pub registry_url: Url,
-    pub auth: HashMap<String, String>,
+    pub auth: Auth,
 }
 
 impl Context {
@@ -58,7 +59,7 @@ impl Context {
         Self {
             context_name,
             registry_url,
-            auth: HashMap::new(),
+            auth: Auth::default(),
         }
     }
 
@@ -81,10 +82,10 @@ impl Context {
         let mut context_file = Self::read_file(path).await?;
         context_file.contexts.entry(self.context_name.clone()).and_modify(|registry| {
             registry.url = self.registry_url.clone();
-            registry.auth = Some(self.auth.clone());
+            registry.auth = self.auth.clone();
         }).or_insert_with(|| RegistryContext {
             url: self.registry_url.clone(),
-            auth: Some(self.auth.clone()),
+            auth: self.auth.clone(),
         });
 
         if current {
@@ -94,8 +95,8 @@ impl Context {
         Self::write_file(&context_file, path, true).await
     }
 
-    pub fn set_auth_param(&mut self, key: impl ToString, value: impl ToString) {
-        self.auth.insert(key.to_string(), value.to_string());
+    pub fn set_auth(&mut self, auth: Auth) {
+        self.auth = auth;
     }
 
     async fn read_file(path: &Path) -> Result<ContextFile, Error> {
@@ -120,7 +121,28 @@ struct ContextFile {
 #[derive(Debug, Deserialize, Serialize)]
 struct RegistryContext {
     url: Url,
-    auth: Option<HashMap<String, String>>,
+    #[serde(default)]
+    auth: Auth,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Auth {
+    Oidc {
+        issuer_url: String,
+        client_id: String,
+        access_token: String,
+        refresh_token: Option<String>,
+        expires_at: DateTime<Utc>,
+    },
+    #[serde(other)]
+    None,
+}
+
+impl Default for Auth {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 mod auth {}
