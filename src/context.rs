@@ -42,12 +42,16 @@ impl Context {
         };
 
         let content: ContextFile = serde_json::from_reader(file.into_std().await)?;
-        if let Some((name, RegistryContext { url, .. })) = context_name
+        if let Some((name, RegistryContext { url, auth })) = context_name
             .or_else(|| content.current_context.clone())
             .as_ref()
             .and_then(|name| content.contexts.get(name).map(|ctx| (name, ctx)))
         {
-            Ok(Some(Context::new(name.clone(), url.clone())))
+            Ok(Some(Context::new_with_auth(
+                name.clone(),
+                url.clone(),
+                auth.clone(),
+            )))
         } else {
             Ok(None)
         }
@@ -65,11 +69,16 @@ impl Context {
         }
     }
 
+    #[inline]
     pub fn new(context_name: String, registry_url: Url) -> Self {
+        Self::new_with_auth(context_name, registry_url, Auth::default())
+    }
+
+    pub fn new_with_auth(context_name: String, registry_url: Url, auth: Auth) -> Self {
         Self {
             context_name,
             registry_url,
-            auth: Auth::default(),
+            auth,
         }
     }
 

@@ -8,10 +8,10 @@ use reqwest::RequestBuilder;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::error::Error;
-use crate::{context, provider};
 use crate::context::Auth;
+use crate::error::Error;
 use crate::provider::{ArtifactType, Provider, PushArtifactMetadata};
+use crate::{context, provider};
 
 /// Client for Apicurio Registry API v2
 /// https://www.apicur.io/registry/docs/apicurio-registry/2.0.1.Final/assets-attachments/registry-rest-api.htm
@@ -35,16 +35,12 @@ impl Provider for ClientV2 {
     async fn system_info(&self, auth: &context::Auth) -> Result<provider::SystemInfo, Error> {
         let req = self
             .client
-            .get(self.base_url.join("system/info").unwrap());
+            .get(self.base_url.join("system/info").unwrap())
+            .header(header::ACCEPT, "application/json");
         let req = with_auth(req, auth);
+        tracing::debug!("{:?}", req);
 
-        let res: reqwest::Result<SystemInfo> = req
-            .header(header::ACCEPT, "application/json")
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await;
+        let res: reqwest::Result<SystemInfo> = req.send().await?.error_for_status()?.json().await;
         res.map(Into::into).map_err(Into::into)
     }
 
@@ -63,15 +59,13 @@ impl Provider for ClientV2 {
                         group_id, artifact_id
                     ))
                     .unwrap(),
-            );
+            )
+            .header(header::ACCEPT, "application/json");
         let req = with_auth(req, auth);
+        tracing::debug!("{:?}", req);
 
-        let res: reqwest::Result<ArtifactMetadata> = req
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await;
+        let res: reqwest::Result<ArtifactMetadata> =
+            req.send().await?.error_for_status()?.json().await;
         res.map(Into::into).map_err(Into::into)
     }
 
@@ -91,15 +85,13 @@ impl Provider for ClientV2 {
                         group_id, artifact_id, version
                     ))
                     .unwrap(),
-            );
+            )
+            .header(header::ACCEPT, "application/json");
         let req = with_auth(req, auth);
+        tracing::debug!("{:?}", req);
 
-        let res: reqwest::Result<ArtifactVersionMetadata> = req
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await;
+        let res: reqwest::Result<ArtifactVersionMetadata> =
+            req.send().await?.error_for_status()?.json().await;
         res.map(Into::into).map_err(Into::into)
     }
 
@@ -119,15 +111,12 @@ impl Provider for ClientV2 {
                         group_id, artifact_id, version
                     ))
                     .unwrap(),
-            );
+            )
+            .header(header::ACCEPT, "application/json");
         let req = with_auth(req, auth);
+        tracing::debug!("{:?}", req);
 
-        let body = req
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?;
+        let body = req.send().await?.error_for_status()?.bytes().await?;
         Ok(body.to_vec())
     }
 
@@ -137,11 +126,14 @@ impl Provider for ClientV2 {
         content: Vec<u8>,
         auth: &context::Auth,
     ) -> Result<(), Error> {
-        let req = self.client.post(
-            self.base_url
-                .join(&format!("groups/{}/artifacts", metadata.group_id))
-                .unwrap(),
-        );
+        let req = self
+            .client
+            .post(
+                self.base_url
+                    .join(&format!("groups/{}/artifacts", metadata.group_id))
+                    .unwrap(),
+            )
+            .header(header::ACCEPT, "application/json");
         let req = with_auth(req, auth);
 
         let req = if let Some(typ) = metadata.artifact_type {
@@ -150,15 +142,16 @@ impl Provider for ClientV2 {
             req
         };
 
-        req
+        let req = req
             .header("X-Registry-ArtifactId", &metadata.artifact_id)
             .query(&[("ifExists", "RETURN_OR_UPDATE")])
-            .body(content)
-            .send()
-            .await?
-            .error_for_status()?;
+            .body(content);
+        tracing::debug!("{:?}", req);
 
-        self.client
+        req.send().await?.error_for_status()?;
+
+        let req = self
+            .client
             .put(
                 self.base_url
                     .join(&format!(
@@ -167,15 +160,17 @@ impl Provider for ClientV2 {
                     ))
                     .unwrap(),
             )
+            .header(header::ACCEPT, "application/json")
             .json(&UpdateArtifactMetadataBody {
                 name: metadata.name,
                 description: metadata.description,
                 labels: metadata.labels,
                 properties: metadata.properties,
-            })
-            .send()
-            .await?
-            .error_for_status()?;
+            });
+        let req = with_auth(req, auth);
+        tracing::debug!("{:?}", req);
+
+        req.send().await?.error_for_status()?;
         Ok(())
     }
 }

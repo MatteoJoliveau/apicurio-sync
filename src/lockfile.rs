@@ -53,7 +53,12 @@ impl LockFile {
         Ok(lock_file)
     }
 
-    pub async fn update(&mut self, config: &Config, provider: &impl Provider, auth: &context::Auth) -> Result<(), Error> {
+    pub async fn update(
+        &mut self,
+        config: &Config,
+        provider: &impl Provider,
+        auth: &context::Auth,
+    ) -> Result<(), Error> {
         self.generate(config, provider, true, auth).await
     }
 

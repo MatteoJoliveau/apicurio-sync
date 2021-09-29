@@ -24,9 +24,6 @@ impl Client {
     }
 
     pub fn v2(&self) -> ClientV2 {
-        ClientV2::new(
-            self.base_url.clone(),
-            self.client.clone(),
-        )
+        ClientV2::new(self.base_url.clone(), self.client.clone())
     }
 }

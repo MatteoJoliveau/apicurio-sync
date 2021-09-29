@@ -7,7 +7,11 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use http::StatusCode;
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
-use openidconnect::{AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope, StandardErrorResponse};
+use openidconnect::{
+    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope,
+    StandardErrorResponse,
+};
 use serde::Deserialize;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, RwLock};
@@ -52,14 +56,20 @@ impl OidcProvider {
         .await
         .map_err(|err| Error::Auth(err.into()))?;
         let client_secret = client_secret.map(|secret| secret.to_string());
-        let scopes = scope.to_string().split(' ').map(|scope| Scope::new(scope.to_string())).collect();
+        let scopes = scope
+            .to_string()
+            .split(' ')
+            .map(|scope| Scope::new(scope.to_string()))
+            .collect();
         Ok(Self {
             issuer_url: issuer_url.to_string(),
             client_id: client_id.to_string(),
             client: CoreClient::from_provider_metadata(
                 metadata,
                 ClientId::new(client_id.to_string()),
-                client_secret.as_ref().map(|secret| ClientSecret::new(secret.to_string())),
+                client_secret
+                    .as_ref()
+                    .map(|secret| ClientSecret::new(secret.to_string())),
             )
             .set_redirect_uri(RedirectUrl::new(format!(
                 "http://localhost:{}/callback",
@@ -77,13 +87,11 @@ impl OidcProvider {
 impl AuthProvider for OidcProvider {
     async fn login(&self, mut ctx: Context) -> Result<Context, Error> {
         // Generate the full authorization URL.
-        let mut req = self
-            .client
-            .authorize_url(
-                CoreAuthenticationFlow::AuthorizationCode,
-                CsrfToken::new_random,
-                Nonce::new_random,
-            );
+        let mut req = self.client.authorize_url(
+            CoreAuthenticationFlow::AuthorizationCode,
+            CsrfToken::new_random,
+            Nonce::new_random,
+        );
         for scope in self.scopes.clone() {
             req = req.add_scope(scope);
         }
@@ -107,7 +115,7 @@ impl AuthProvider for OidcProvider {
         );
 
         open::that(&auth_url.to_string())?;
-        eprintln!("The login page has been opened on your default browser. You can also manually visit {}", auth_url);
+        tracing::info!("The login page has been opened on your default browser. You can also manually visit {}", auth_url);
         server.await;
 
         let this = this.read().await;
@@ -153,7 +161,7 @@ async fn callback_handler(
             RequestTokenError::Parse(inner, _) => inner.to_string(),
             RequestTokenError::Other(_) => "".to_string(),
         };
-        eprintln!("ERROR: {} {}", err, msg);
+        tracing::info!("ERROR: {} {}", err, msg);
         tx.send(()).await.expect("shutdown::send");
         return Ok(warp::reply::with_status(
             warp::reply::html(format!(
