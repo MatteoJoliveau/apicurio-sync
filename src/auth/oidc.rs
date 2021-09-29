@@ -7,11 +7,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use http::StatusCode;
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
-use openidconnect::{
-    AuthorizationCode, ClientId, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope,
-    StandardErrorResponse,
-};
+use openidconnect::{AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope, StandardErrorResponse};
 use serde::Deserialize;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, RwLock};
@@ -34,6 +30,8 @@ pub struct TokenSet {
 pub struct OidcProvider {
     issuer_url: String,
     client_id: String,
+    client_secret: Option<String>,
+    scopes: Vec<Scope>,
     client: CoreClient,
     tokens: Option<TokenSet>,
     port: u16,
@@ -43,6 +41,8 @@ impl OidcProvider {
     pub async fn new(
         issuer_url: impl ToString,
         client_id: impl ToString,
+        client_secret: Option<impl ToString>,
+        scope: impl ToString,
         port: u16,
     ) -> Result<Self, Error> {
         let metadata = CoreProviderMetadata::discover_async(
@@ -51,18 +51,22 @@ impl OidcProvider {
         )
         .await
         .map_err(|err| Error::Auth(err.into()))?;
+        let client_secret = client_secret.map(|secret| secret.to_string());
+        let scopes = scope.to_string().split(' ').map(|scope| Scope::new(scope.to_string())).collect();
         Ok(Self {
             issuer_url: issuer_url.to_string(),
             client_id: client_id.to_string(),
             client: CoreClient::from_provider_metadata(
                 metadata,
                 ClientId::new(client_id.to_string()),
-                None,
+                client_secret.as_ref().map(|secret| ClientSecret::new(secret.to_string())),
             )
             .set_redirect_uri(RedirectUrl::new(format!(
                 "http://localhost:{}/callback",
                 port
             ))?),
+            client_secret,
+            scopes,
             tokens: None,
             port,
         })
@@ -73,19 +77,18 @@ impl OidcProvider {
 impl AuthProvider for OidcProvider {
     async fn login(&self, mut ctx: Context) -> Result<Context, Error> {
         // Generate the full authorization URL.
-        let (auth_url, csrf_token, nonce) = self
+        let mut req = self
             .client
             .authorize_url(
                 CoreAuthenticationFlow::AuthorizationCode,
                 CsrfToken::new_random,
                 Nonce::new_random,
-            )
-            // Set the desired scopes.
-            .add_scope(Scope::new("openid".to_string()))
-            .add_scope(Scope::new("profile".to_string()))
-            .add_scope(Scope::new("email".to_string()))
-            // .add_scope(Scope::new("groups".to_string()))
-            .url();
+            );
+        for scope in self.scopes.clone() {
+            req = req.add_scope(scope);
+        }
+
+        let (auth_url, _csrf_token, _nonce) = req.url();
 
         let this = Arc::new(RwLock::new(self.clone()));
         let (tx, mut rx) = mpsc::channel(1);

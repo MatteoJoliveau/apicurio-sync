@@ -2,6 +2,7 @@
 extern crate lazy_static;
 
 use std::future::Future;
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
 use crate::auth::oidc::OidcProvider;
@@ -10,6 +11,7 @@ use structopt::StructOpt;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use url::Url;
+use crate::auth::basic::BasicAuthProvider;
 
 use crate::client::Client;
 use crate::config::Config;
@@ -40,22 +42,26 @@ lazy_static! {
 #[derive(Debug, StructOpt)]
 enum Command {
     #[structopt(
-        about = "Updates the project lockfile with the registry without updating the artifacts themselves",
-        long_about = "Updates the project lockfile with the registry, by fetching the required version (if specified) or the latest version from the API. This operation does not update the artifacts themselves. Rerun `sync` to do so."
+    about = "Updates the project lockfile with the registry without updating the artifacts themselves",
+    long_about = "Updates the project lockfile with the registry, by fetching the required version (if specified) or the latest version from the API. This operation does not update the artifacts themselves. Rerun `sync` to do so."
     )]
     Update,
     #[structopt(long_about = "Initializes an empty config file")]
     Init,
     #[structopt(
-        about = "Synchronizes artifacts with the registry",
-        long_about = "Synchronizes artifacts with the registry. Push operations upload artifacts to the registry, while pull operations downloads them into the specified local folder"
+    about = "Synchronizes artifacts with the registry",
+    long_about = "Synchronizes artifacts with the registry. Push operations upload artifacts to the registry, while pull operations downloads them into the specified local folder"
     )]
     Sync,
     #[structopt(
-        about = "Work with context",
-        long_about = "Manipulate the local CLI context. The context is used to configure registries and their authentication credentials"
+    about = "Work with context",
+    long_about = "Manipulate the local CLI context. The context is used to configure registries and their authentication credentials"
     )]
     Context(ContextCommand),
+    #[structopt(
+    about = "Print registry information for debugging purposes",
+    )]
+    Info,
 }
 
 #[derive(Debug, StructOpt)]
@@ -81,29 +87,39 @@ enum ContextCommand {
 #[derive(Debug, StructOpt)]
 enum LoginCommand {
     Oidc {
-        #[structopt(short, long, help = "The OIDC Client ID to use")]
+        #[structopt(long, help = "The OIDC Client ID to use")]
         client_id: String,
+        #[structopt(long, help = "The OIDC Client Secret to use")]
+        client_secret: Option<String>,
+        #[structopt(long, help = "The OIDC scope to use", default_value = "openid profile email offline_access")]
+        scope: String,
         #[structopt(
-            short,
-            long,
-            help = "Local network port to use for receiving the authentication info",
-            default_value = "9876"
+        short,
+        long,
+        help = "Local network port to use for receiving the authentication info",
+        default_value = "9876"
         )]
         port: u16,
         issuer_url: String,
+    },
+    Basic {
+        #[structopt(short, long, help = "Username")]
+        username: String,
+        #[structopt(long, help = "Signals that the password will be provided via stdin. If false, no password is set")]
+        password_stdin: bool,
     },
 }
 
 #[derive(Debug, StructOpt)]
 struct Opts {
     #[structopt(
-        short = "f",
-        long = "config-file",
-        default_value = "apicurio-sync.yaml",
-        env = "APICURIO_SYNC_CONFIG_FILE",
-        help = "The configuration file to use",
-        parse(from_os_str),
-        global = true
+    short = "f",
+    long = "config-file",
+    default_value = "apicurio-sync.yaml",
+    env = "APICURIO_SYNC_CONFIG_FILE",
+    help = "The configuration file to use",
+    parse(from_os_str),
+    global = true
     )]
     config: PathBuf,
     #[structopt(
@@ -115,11 +131,11 @@ struct Opts {
     global = true)]
     context: PathBuf,
     #[structopt(
-        long = "cwd",
-        help = "The working directory to use. Every operation will happen inside this directory. Defaults to the current directory.",
-        env = "APICURIO_SYNC_WORKDIR",
-        parse(from_os_str),
-        global = true
+    long = "cwd",
+    help = "The working directory to use. Every operation will happen inside this directory. Defaults to the current directory.",
+    env = "APICURIO_SYNC_WORKDIR",
+    parse(from_os_str),
+    global = true
     )]
     cwd: Option<PathBuf>,
     #[structopt(subcommand)]
@@ -153,16 +169,17 @@ async fn run() -> Result<(), Error> {
     match opts.cmd.as_ref().unwrap_or(&Command::Sync {}) {
         Command::Update => update(&client_v2, &config, &mut lockfile, &auth).await,
         Command::Sync => sync(&client_v2, &plan, &workdir, &auth).await,
+        Command::Info => info(&client_v2, &auth).await,
         Command::Context(_) =>
         /* We already run Context */
-        {
-            Ok(())
-        }
+            {
+                Ok(())
+            }
         Command::Init =>
         /* we already run Init */
-        {
-            Ok(())
-        }
+            {
+                Ok(())
+            }
     }
 }
 
@@ -194,7 +211,7 @@ async fn sync(provider: &impl Provider, plan: &Plan, workdir: &Path, auth: &cont
 
 async fn context<
     P: AsRef<Path>,
-    Fut: Future<Output = Result<Context, Error>>,
+    Fut: Future<Output=Result<Context, Error>>,
     Fun: FnOnce(P) -> Fut,
 >(
     cmd: ContextCommand,
@@ -249,17 +266,36 @@ async fn login<P: AsRef<Path>>(cmd: LoginCommand, ctx_path: P) -> Result<(), Err
         .await?
         .ok_or_else(|| Error::setup("No current context configured!"))?;
 
-    let provider = match cmd {
+    let provider: Box<dyn AuthProvider> = match cmd {
         LoginCommand::Oidc {
             issuer_url,
             client_id,
+            client_secret,
+            scope,
             port,
-        } => OidcProvider::new(issuer_url, client_id, port).await?,
+        } => Box::new(OidcProvider::new(issuer_url, client_id, client_secret, scope, port).await?),
+        LoginCommand::Basic { username, password_stdin } => {
+            let password = if password_stdin {
+                let mut pwd = String::new();
+                std::io::stdin().lock().read_line(&mut pwd)?;
+
+                Some(pwd.trim_end_matches('\n').to_string())
+            } else {
+                None
+            };
+            Box::new(BasicAuthProvider::new(username, password))
+        }
     };
 
     let ctx = provider.login(ctx).await?;
     ctx.write(path, true).await?;
     eprintln!("Updated context auth information");
+    Ok(())
+}
+
+async fn info(provider: &impl Provider, auth: &context::Auth) -> Result<(), Error> {
+    let info = provider.system_info(auth).await?;
+    eprintln!("{:?}", info);
     Ok(())
 }
 

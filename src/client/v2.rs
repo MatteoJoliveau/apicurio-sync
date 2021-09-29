@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::auth::AuthProvider;
 use async_trait::async_trait;
+use http::header;
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -38,6 +39,7 @@ impl Provider for ClientV2 {
         let req = with_auth(req, auth);
 
         let res: reqwest::Result<SystemInfo> = req
+            .header(header::ACCEPT, "application/json")
             .send()
             .await?
             .error_for_status()?
@@ -181,6 +183,7 @@ impl Provider for ClientV2 {
 fn with_auth(req: RequestBuilder, auth: &context::Auth) -> RequestBuilder {
     match auth {
         Auth::Oidc { access_token, .. } => req.bearer_auth(access_token),
+        Auth::Basic { username, password } => req.basic_auth(username, password.as_ref()),
         Auth::None => req,
     }
 }

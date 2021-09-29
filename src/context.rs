@@ -158,7 +158,7 @@ pub enum Auth {
     },
     Basic {
         username: String,
-        password: String,
+        password: Option<String>,
     },
     #[serde(other)]
     None,
