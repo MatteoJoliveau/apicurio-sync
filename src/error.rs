@@ -6,6 +6,7 @@ pub enum Error {
     Io(std::io::Error),
     Parse(Box<dyn std::error::Error>),
     Setup(String),
+    Auth(Box<dyn std::error::Error>),
 }
 
 impl Error {
@@ -21,6 +22,7 @@ impl Display for Error {
             Error::Io(err) => err.fmt(f),
             Error::Setup(msg) => msg.fmt(f),
             Error::Parse(err) => err.fmt(f),
+            Error::Auth(err) => err.fmt(f),
         }
     }
 }
@@ -31,6 +33,7 @@ impl std::error::Error for Error {
             Error::Http(err) => Some(err),
             Error::Io(err) => Some(err),
             Error::Parse(err) => Some(err.as_ref()),
+            Error::Auth(err) => Some(err.as_ref()),
             _ => None,
         }
     }

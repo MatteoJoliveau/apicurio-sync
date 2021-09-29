@@ -8,6 +8,8 @@ use structopt::StructOpt;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use url::Url;
+use crate::auth::AuthProvider;
+use crate::auth::oidc::OidcProvider;
 
 use crate::client::Client;
 use crate::config::Config;
@@ -17,6 +19,7 @@ use crate::lockfile::LockFile;
 use crate::plan::Plan;
 use crate::provider::{NoopProvider, Provider};
 
+mod auth;
 mod client;
 mod config;
 mod context;
@@ -72,6 +75,19 @@ enum ContextCommand {
     },
     #[structopt(long_about = "Print all context configurations")]
     Show,
+    #[structopt(long_about = "Authenticate with the current registry")]
+    Login(LoginCommand),
+}
+
+#[derive(Debug, StructOpt)]
+enum LoginCommand {
+    Oidc {
+        #[structopt(short, long, help = "The OIDC Client ID to use")]
+        client_id: String,
+        #[structopt(short, long, help = "Local network port to use for receiving the authentication info", default_value = "9876")]
+        port: u16,
+        issuer_url: String,
+    },
 }
 
 #[derive(Debug, StructOpt)]
@@ -87,7 +103,7 @@ struct Opts {
     config: PathBuf,
     #[structopt(
     long = "context-file",
-    default_value = &CONTEXT_FILE,
+    default_value = & CONTEXT_FILE,
     env = "APICURIO_SYNC_CONTEXT_FILE",
     help = "The context file to use",
     parse(from_os_str),
@@ -185,7 +201,24 @@ async fn context<P: AsRef<Path>, Fut: Future<Output=Result<Context, Error>>, Fun
             println!("{}", buf);
             Ok(())
         }
+        ContextCommand::Login(cmd) => {
+            login(cmd, ctx_path).await
+        }
     }
+}
+
+async fn login<P: AsRef<Path>>(cmd: LoginCommand, ctx_path: P) -> Result<(), Error> {
+    let path = ctx_path.as_ref();
+    let ctx = Context::from_file(path, None).await?.ok_or_else(|| Error::setup("No current context configured!"))?;
+
+    let provider = match cmd {
+        LoginCommand::Oidc { issuer_url, client_id, port } => OidcProvider::new(issuer_url, client_id, port).await?,
+    };
+
+    let ctx = provider.login(ctx).await?;
+    ctx.write(path, true).await?;
+    eprintln!("Updated context auth information");
+    Ok(())
 }
 
 #[tokio::main]

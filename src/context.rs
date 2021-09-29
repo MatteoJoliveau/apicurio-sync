@@ -15,6 +15,7 @@ const REGISTRY_URL_ENVAR: &str = "APICURIO_SYNC_REGISTRY_URL";
 pub struct Context {
     pub context_name: String,
     pub registry_url: Url,
+    pub auth: HashMap<String, String>,
 }
 
 impl Context {
@@ -57,6 +58,7 @@ impl Context {
         Self {
             context_name,
             registry_url,
+            auth: HashMap::new(),
         }
     }
 
@@ -79,8 +81,10 @@ impl Context {
         let mut context_file = Self::read_file(path).await?;
         context_file.contexts.entry(self.context_name.clone()).and_modify(|registry| {
             registry.url = self.registry_url.clone();
+            registry.auth = Some(self.auth.clone());
         }).or_insert_with(|| RegistryContext {
             url: self.registry_url.clone(),
+            auth: Some(self.auth.clone()),
         });
 
         if current {
@@ -88,6 +92,10 @@ impl Context {
         }
 
         Self::write_file(&context_file, path, true).await
+    }
+
+    pub fn set_auth_param(&mut self, key: impl ToString, value: impl ToString) {
+        self.auth.insert(key.to_string(), value.to_string());
     }
 
     async fn read_file(path: &Path) -> Result<ContextFile, Error> {
@@ -112,6 +120,7 @@ struct ContextFile {
 #[derive(Debug, Deserialize, Serialize)]
 struct RegistryContext {
     url: Url,
+    auth: Option<HashMap<String, String>>,
 }
 
 mod auth {}
