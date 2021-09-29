@@ -68,4 +68,3 @@ impl From<url::ParseError> for Error {
         Self::Parse(Box::new(err))
     }
 }
-

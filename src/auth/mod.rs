@@ -1,8 +1,9 @@
+pub mod basic;
 pub mod oidc;
 
-use async_trait::async_trait;
 use crate::context::Context;
 use crate::error::Error;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait AuthProvider {

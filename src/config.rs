@@ -20,15 +20,24 @@ pub struct Config {
 impl Config {
     pub async fn load_from_file(path: PathBuf) -> std::io::Result<Self> {
         let cfg_file = File::open(&path).await?;
-        let mut cfg_yaml: Config = serde_yaml::from_reader(cfg_file.into_std().await).map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+        let mut cfg_yaml: Config = serde_yaml::from_reader(cfg_file.into_std().await)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
         cfg_yaml.path = path;
         Ok(cfg_yaml)
     }
 
     pub async fn write_empty(path: PathBuf) -> std::io::Result<Self> {
-        let mut file = OpenOptions::new().write(true).create_new(true).open(&path).await?;
-        let cfg = Config{ path, ..Default::default() };
-        let content = serde_yaml::to_vec(&cfg).map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await?;
+        let cfg = Config {
+            path,
+            ..Default::default()
+        };
+        let content = serde_yaml::to_vec(&cfg)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
         file.write_all(&content).await?;
         Ok(cfg)
     }

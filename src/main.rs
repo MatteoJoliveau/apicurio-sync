@@ -4,12 +4,12 @@ extern crate lazy_static;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 
+use crate::auth::oidc::OidcProvider;
+use crate::auth::AuthProvider;
 use structopt::StructOpt;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use url::Url;
-use crate::auth::AuthProvider;
-use crate::auth::oidc::OidcProvider;
 
 use crate::client::Client;
 use crate::config::Config;
@@ -25,8 +25,8 @@ mod config;
 mod context;
 mod error;
 mod lockfile;
-mod provider;
 mod plan;
+mod provider;
 mod sync;
 
 lazy_static! {
@@ -34,27 +34,26 @@ lazy_static! {
         let dir = dirs::config_dir().expect("dirs::config_dir");
         format!("{}/{}", dir.to_str().unwrap(), env!("CARGO_BIN_NAME"))
     };
-
     static ref CONTEXT_FILE: String = format!("{}/context.json", CONFIG_DIR.as_str());
 }
 
 #[derive(Debug, StructOpt)]
 enum Command {
     #[structopt(
-    about = "Updates the project lockfile with the registry without updating the artifacts themselves",
-    long_about = "Updates the project lockfile with the registry, by fetching the required version (if specified) or the latest version from the API. This operation does not update the artifacts themselves. Rerun `sync` to do so."
+        about = "Updates the project lockfile with the registry without updating the artifacts themselves",
+        long_about = "Updates the project lockfile with the registry, by fetching the required version (if specified) or the latest version from the API. This operation does not update the artifacts themselves. Rerun `sync` to do so."
     )]
     Update,
     #[structopt(long_about = "Initializes an empty config file")]
     Init,
     #[structopt(
-    about = "Synchronizes artifacts with the registry",
-    long_about = "Synchronizes artifacts with the registry. Push operations upload artifacts to the registry, while pull operations downloads them into the specified local folder"
+        about = "Synchronizes artifacts with the registry",
+        long_about = "Synchronizes artifacts with the registry. Push operations upload artifacts to the registry, while pull operations downloads them into the specified local folder"
     )]
     Sync,
     #[structopt(
-    about = "Work with context",
-    long_about = "Manipulate the local CLI context. The context is used to configure registries and their authentication credentials"
+        about = "Work with context",
+        long_about = "Manipulate the local CLI context. The context is used to configure registries and their authentication credentials"
     )]
     Context(ContextCommand),
 }
@@ -84,7 +83,12 @@ enum LoginCommand {
     Oidc {
         #[structopt(short, long, help = "The OIDC Client ID to use")]
         client_id: String,
-        #[structopt(short, long, help = "Local network port to use for receiving the authentication info", default_value = "9876")]
+        #[structopt(
+            short,
+            long,
+            help = "Local network port to use for receiving the authentication info",
+            default_value = "9876"
+        )]
         port: u16,
         issuer_url: String,
     },
@@ -93,13 +97,14 @@ enum LoginCommand {
 #[derive(Debug, StructOpt)]
 struct Opts {
     #[structopt(
-    short = "f",
-    long = "config-file",
-    default_value = "apicurio-sync.yaml",
-    env = "APICURIO_SYNC_CONFIG_FILE",
-    help = "The configuration file to use",
-    parse(from_os_str),
-    global = true)]
+        short = "f",
+        long = "config-file",
+        default_value = "apicurio-sync.yaml",
+        env = "APICURIO_SYNC_CONFIG_FILE",
+        help = "The configuration file to use",
+        parse(from_os_str),
+        global = true
+    )]
     config: PathBuf,
     #[structopt(
     long = "context-file",
@@ -110,11 +115,12 @@ struct Opts {
     global = true)]
     context: PathBuf,
     #[structopt(
-    long = "cwd",
-    help = "The working directory to use. Every operation will happen inside this directory. Defaults to the current directory.",
-    env = "APICURIO_SYNC_WORKDIR",
-    parse(from_os_str),
-    global = true)]
+        long = "cwd",
+        help = "The working directory to use. Every operation will happen inside this directory. Defaults to the current directory.",
+        env = "APICURIO_SYNC_WORKDIR",
+        parse(from_os_str),
+        global = true
+    )]
     cwd: Option<PathBuf>,
     #[structopt(subcommand)]
     cmd: Option<Command>,
@@ -122,10 +128,12 @@ struct Opts {
 
 async fn run() -> Result<(), Error> {
     let opts: Opts = Opts::from_args();
-    let workdir = opts.cwd.unwrap_or_else(|| std::env::current_dir().expect("current_dir"));
+    let workdir = opts
+        .cwd
+        .unwrap_or_else(|| std::env::current_dir().expect("current_dir"));
     let cfg_file = workdir.join(opts.config);
     if let Some(Command::Init) = opts.cmd {
-        return init(cfg_file, &NoopProvider).await;
+        return init(cfg_file, &NoopProvider, &context::Auth::None).await;
     }
 
     let ctx_path = &opts.context;
@@ -135,42 +143,64 @@ async fn run() -> Result<(), Error> {
     }
 
     let ctx = ctx_fn(ctx_path).await?;
+    let auth = ctx.auth.clone();
     let config = Config::load_from_file(cfg_file).await?;
     let client_v2 = Client::new(ctx.registry_url.clone()).v2();
-    let mut lockfile = LockFile::try_load_for_config(&config, &client_v2).await?;
+    let mut lockfile = LockFile::try_load_for_config(&config, &client_v2, &auth).await?;
     let plan = Plan::new(ctx)
         .merge_with_config(&config)
         .merge_with_lockfile(&lockfile);
     match opts.cmd.as_ref().unwrap_or(&Command::Sync {}) {
-        Command::Update => update(&client_v2, &config, &mut lockfile).await,
-        Command::Sync => sync(&client_v2, &plan, &workdir).await,
-        Command::Context(_) => /* We already run Context */ Ok(()),
-        Command::Init => /* we already run Init */ Ok(()),
+        Command::Update => update(&client_v2, &config, &mut lockfile, &auth).await,
+        Command::Sync => sync(&client_v2, &plan, &workdir, &auth).await,
+        Command::Context(_) =>
+        /* We already run Context */
+        {
+            Ok(())
+        }
+        Command::Init =>
+        /* we already run Init */
+        {
+            Ok(())
+        }
     }
 }
 
-async fn update(provider: &impl Provider, config: &Config, lockfile: &mut LockFile) -> Result<(), Error> {
+async fn update(
+    provider: &impl Provider,
+    config: &Config,
+    lockfile: &mut LockFile,
+    auth: &context::Auth,
+) -> Result<(), Error> {
     eprintln!("Updating lockfile with remote registry");
-    lockfile.update(config, provider).await?;
+    lockfile.update(config, provider, auth).await?;
     eprintln!("Lockfile update completed. Rerun sync to update the artifacts");
     Ok(())
 }
 
-async fn init(cfg_file: PathBuf, provider: &impl Provider) -> Result<(), Error> {
+async fn init(cfg_file: PathBuf, provider: &impl Provider, auth: &context::Auth) -> Result<(), Error> {
     let config = Config::write_empty(cfg_file).await?;
-    LockFile::try_load_for_config(&config, provider).await?;
+    LockFile::try_load_for_config(&config, provider, auth).await?;
     Ok(())
 }
 
-async fn sync(provider: &impl Provider, plan: &Plan, workdir: &Path) -> Result<(), Error> {
+async fn sync(provider: &impl Provider, plan: &Plan, workdir: &Path, auth: &context::Auth) -> Result<(), Error> {
     eprintln!("Syncing artifacts with remote registry");
-    sync::pull_artifacts(provider, plan, workdir).await?;
-    sync::push_artifacts(provider, plan, workdir).await?;
+    sync::pull_artifacts(provider, plan, workdir, auth).await?;
+    sync::push_artifacts(provider, plan, workdir, auth).await?;
     eprintln!("Sync completed");
     Ok(())
 }
 
-async fn context<P: AsRef<Path>, Fut: Future<Output=Result<Context, Error>>, Fun: FnOnce(P) -> Fut>(cmd: ContextCommand, ctx_path: P, load_ctx: Fun) -> Result<(), Error> {
+async fn context<
+    P: AsRef<Path>,
+    Fut: Future<Output = Result<Context, Error>>,
+    Fun: FnOnce(P) -> Fut,
+>(
+    cmd: ContextCommand,
+    ctx_path: P,
+    load_ctx: Fun,
+) -> Result<(), Error> {
     match cmd {
         ContextCommand::Current => {
             let ctx = load_ctx(ctx_path).await?;
@@ -181,11 +211,19 @@ async fn context<P: AsRef<Path>, Fut: Future<Output=Result<Context, Error>>, Fun
             Context::write_empty_file(ctx_path.as_ref()).await?;
             eprintln!("Initialzed empty context file");
             Ok(())
-        },
-        ContextCommand::Set { context_name, url, current } => {
+        }
+        ContextCommand::Set {
+            context_name,
+            url,
+            current,
+        } => {
             let path = ctx_path.as_ref();
-            let mut ctx = Context::from_file(path, Some(context_name.clone())).await?
-                .or_else(|| url.clone().map(|url| Context::new(context_name.clone(), url)))
+            let mut ctx = Context::from_file(path, Some(context_name.clone()))
+                .await?
+                .or_else(|| {
+                    url.clone()
+                        .map(|url| Context::new(context_name.clone(), url))
+                })
                 .ok_or_else(|| Error::setup("URL is required to create a new context"))?;
             if let Some(url) = url {
                 ctx.registry_url = url;
@@ -193,7 +231,7 @@ async fn context<P: AsRef<Path>, Fut: Future<Output=Result<Context, Error>>, Fun
             ctx.write(path, current).await?;
             eprintln!("Updated context {}", context_name);
             Ok(())
-        },
+        }
         ContextCommand::Show => {
             let mut file = File::open(ctx_path.as_ref()).await?;
             let mut buf = String::new();
@@ -201,18 +239,22 @@ async fn context<P: AsRef<Path>, Fut: Future<Output=Result<Context, Error>>, Fun
             println!("{}", buf);
             Ok(())
         }
-        ContextCommand::Login(cmd) => {
-            login(cmd, ctx_path).await
-        }
+        ContextCommand::Login(cmd) => login(cmd, ctx_path).await,
     }
 }
 
 async fn login<P: AsRef<Path>>(cmd: LoginCommand, ctx_path: P) -> Result<(), Error> {
     let path = ctx_path.as_ref();
-    let ctx = Context::from_file(path, None).await?.ok_or_else(|| Error::setup("No current context configured!"))?;
+    let ctx = Context::from_file(path, None)
+        .await?
+        .ok_or_else(|| Error::setup("No current context configured!"))?;
 
     let provider = match cmd {
-        LoginCommand::Oidc { issuer_url, client_id, port } => OidcProvider::new(issuer_url, client_id, port).await?,
+        LoginCommand::Oidc {
+            issuer_url,
+            client_id,
+            port,
+        } => OidcProvider::new(issuer_url, client_id, port).await?,
     };
 
     let ctx = provider.login(ctx).await?;

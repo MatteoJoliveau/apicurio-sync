@@ -1,11 +1,15 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
+use crate::auth::AuthProvider;
 use async_trait::async_trait;
+use reqwest::RequestBuilder;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::error::Error;
-use crate::provider;
+use crate::{context, provider};
+use crate::context::Auth;
 use crate::provider::{ArtifactType, Provider, PushArtifactMetadata};
 
 /// Client for Apicurio Registry API v2
@@ -27,60 +31,157 @@ impl ClientV2 {
 
 #[async_trait]
 impl Provider for ClientV2 {
-    async fn system_info(&self) -> Result<provider::SystemInfo, Error> {
-        let res: reqwest::Result<SystemInfo> = self.client.get(self.base_url.join("system/info").unwrap()).send().await?
+    async fn system_info(&self, auth: &context::Auth) -> Result<provider::SystemInfo, Error> {
+        let req = self
+            .client
+            .get(self.base_url.join("system/info").unwrap());
+        let req = with_auth(req, auth);
+
+        let res: reqwest::Result<SystemInfo> = req
+            .send()
+            .await?
             .error_for_status()?
-            .json().await;
-        res
-            .map(Into::into)
-            .map_err(Into::into)
+            .json()
+            .await;
+        res.map(Into::into).map_err(Into::into)
     }
 
-    async fn fetch_artifact_metadata(&self, group_id: &str, artifact_id: &str) -> Result<provider::ArtifactMetadata, Error> {
-        let res: reqwest::Result<ArtifactMetadata> = self.client.get(self.base_url.join(&format!("groups/{}/artifacts/{}/meta", group_id, artifact_id)).unwrap()).send().await?
+    async fn fetch_artifact_metadata(
+        &self,
+        group_id: &str,
+        artifact_id: &str,
+        auth: &context::Auth,
+    ) -> Result<provider::ArtifactMetadata, Error> {
+        let req = self
+            .client
+            .get(
+                self.base_url
+                    .join(&format!(
+                        "groups/{}/artifacts/{}/meta",
+                        group_id, artifact_id
+                    ))
+                    .unwrap(),
+            );
+        let req = with_auth(req, auth);
+
+        let res: reqwest::Result<ArtifactMetadata> = req
+            .send()
+            .await?
             .error_for_status()?
-            .json().await;
-        res
-            .map(Into::into)
-            .map_err(Into::into)
+            .json()
+            .await;
+        res.map(Into::into).map_err(Into::into)
     }
 
-    async fn fetch_artifact_version_metadata(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<provider::ArtifactVersionMetadata, Error> {
-        let res: reqwest::Result<ArtifactVersionMetadata> = self.client.get(self.base_url.join(&format!("groups/{}/artifacts/{}/versions/{}/meta", group_id, artifact_id, version)).unwrap()).send().await?
+    async fn fetch_artifact_version_metadata(
+        &self,
+        group_id: &str,
+        artifact_id: &str,
+        version: &str,
+        auth: &context::Auth,
+    ) -> Result<provider::ArtifactVersionMetadata, Error> {
+        let req = self
+            .client
+            .get(
+                self.base_url
+                    .join(&format!(
+                        "groups/{}/artifacts/{}/versions/{}/meta",
+                        group_id, artifact_id, version
+                    ))
+                    .unwrap(),
+            );
+        let req = with_auth(req, auth);
+
+        let res: reqwest::Result<ArtifactVersionMetadata> = req
+            .send()
+            .await?
             .error_for_status()?
-            .json().await;
-        res
-            .map(Into::into)
-            .map_err(Into::into)
+            .json()
+            .await;
+        res.map(Into::into).map_err(Into::into)
     }
 
-    async fn fetch_artifact_version(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<Vec<u8>, Error> {
-        let body = self.client.get(self.base_url.join(&format!("groups/{}/artifacts/{}/versions/{}", group_id, artifact_id, version)).unwrap()).send().await?
+    async fn fetch_artifact_version(
+        &self,
+        group_id: &str,
+        artifact_id: &str,
+        version: &str,
+        auth: &context::Auth,
+    ) -> Result<Vec<u8>, Error> {
+        let req = self
+            .client
+            .get(
+                self.base_url
+                    .join(&format!(
+                        "groups/{}/artifacts/{}/versions/{}",
+                        group_id, artifact_id, version
+                    ))
+                    .unwrap(),
+            );
+        let req = with_auth(req, auth);
+
+        let body = req
+            .send()
+            .await?
             .error_for_status()?
-            .bytes().await?;
+            .bytes()
+            .await?;
         Ok(body.to_vec())
     }
 
-    async fn push_artifact(&self, metadata: PushArtifactMetadata, content: Vec<u8>) -> Result<(), Error> {
-        let req_builder = self.client.post(self.base_url.join(&format!("groups/{}/artifacts", metadata.group_id)).unwrap());
-        let req_builder = if let Some(typ) = metadata.artifact_type { req_builder.header("X-Registry-ArtifactType", typ.to_string()) } else { req_builder };
-        req_builder
+    async fn push_artifact(
+        &self,
+        metadata: PushArtifactMetadata,
+        content: Vec<u8>,
+        auth: &context::Auth,
+    ) -> Result<(), Error> {
+        let req = self.client.post(
+            self.base_url
+                .join(&format!("groups/{}/artifacts", metadata.group_id))
+                .unwrap(),
+        );
+        let req = with_auth(req, auth);
+
+        let req = if let Some(typ) = metadata.artifact_type {
+            req.header("X-Registry-ArtifactType", typ.to_string())
+        } else {
+            req
+        };
+
+        req
             .header("X-Registry-ArtifactId", &metadata.artifact_id)
             .query(&[("ifExists", "RETURN_OR_UPDATE")])
             .body(content)
-            .send().await?
+            .send()
+            .await?
             .error_for_status()?;
 
-        self.client.put(self.base_url.join(&format!("groups/{}/artifacts/{}/meta", metadata.group_id, metadata.artifact_id)).unwrap())
+        self.client
+            .put(
+                self.base_url
+                    .join(&format!(
+                        "groups/{}/artifacts/{}/meta",
+                        metadata.group_id, metadata.artifact_id
+                    ))
+                    .unwrap(),
+            )
             .json(&UpdateArtifactMetadataBody {
                 name: metadata.name,
                 description: metadata.description,
                 labels: metadata.labels,
                 properties: metadata.properties,
             })
-            .send().await?
+            .send()
+            .await?
             .error_for_status()?;
         Ok(())
+    }
+}
+
+fn with_auth(req: RequestBuilder, auth: &context::Auth) -> RequestBuilder {
+    match auth {
+        Auth::Oidc { access_token, .. } => req.bearer_auth(access_token),
+        Auth::None => req,
     }
 }
 

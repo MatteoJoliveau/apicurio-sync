@@ -25,14 +25,20 @@ impl Plan {
 
     pub fn merge_with_config(mut self, cfg: &Config) -> Self {
         for artifact in &cfg.pull {
-            let mut pull_ref = self.pull.entry(artifact.path.clone()).or_insert_with(PullArtifactRef::default);
+            let mut pull_ref = self
+                .pull
+                .entry(artifact.path.clone())
+                .or_insert_with(PullArtifactRef::default);
             pull_ref.group = Some(artifact.group.clone());
             pull_ref.artifact = Some(artifact.artifact.clone());
             pull_ref.version = artifact.version.clone();
         }
 
         for artifact in &cfg.push {
-            let mut push_ref = self.push.entry(artifact.path.clone()).or_insert_with(PushArtifactRef::default);
+            let mut push_ref = self
+                .push
+                .entry(artifact.path.clone())
+                .or_insert_with(PushArtifactRef::default);
             push_ref.group = Some(artifact.group.clone());
             push_ref.artifact = Some(artifact.artifact.clone());
             push_ref.artifact_type = artifact.artifact_type.clone();
@@ -46,7 +52,10 @@ impl Plan {
 
     pub fn merge_with_lockfile(mut self, lockfile: &LockFile) -> Self {
         for (path, artifact) in &lockfile.pull {
-            let mut pull_ref = self.pull.entry(path.clone()).or_insert_with(PullArtifactRef::default);
+            let mut pull_ref = self
+                .pull
+                .entry(path.clone())
+                .or_insert_with(PullArtifactRef::default);
             pull_ref.group = Some(artifact.group.clone());
             pull_ref.artifact = Some(artifact.artifact.clone());
             pull_ref.version = Some(artifact.version.clone());
@@ -54,7 +63,6 @@ impl Plan {
         self
     }
 }
-
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct PushArtifactRef {

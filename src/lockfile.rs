@@ -6,6 +6,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
 use crate::config::Config;
+use crate::context;
 use crate::error::Error;
 use crate::provider::Provider;
 
@@ -24,32 +25,45 @@ impl LockFile {
         }
     }
 
-    pub async fn try_load_for_config(config: &Config, provider: &impl Provider) -> Result<Self, Error> {
+    pub async fn try_load_for_config(
+        config: &Config,
+        provider: &impl Provider,
+        auth: &context::Auth,
+    ) -> Result<Self, Error> {
         let path = &config.path;
-        let path = path.with_file_name(path.file_name().unwrap()).with_extension("lock");
+        let path = path
+            .with_file_name(path.file_name().unwrap())
+            .with_extension("lock");
         let lock_file = match File::open(&path).await {
             Ok(file) => Some(file),
             Err(err) => match err.kind() {
                 std::io::ErrorKind::NotFound => None,
                 _ => return Err(err.into()),
-            }
+            },
         };
         let mut lock_file = if let Some(lock_file) = lock_file {
-            let mut lock_file: LockFile = serde_json::from_reader(lock_file.into_std().await).map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+            let mut lock_file: LockFile = serde_json::from_reader(lock_file.into_std().await)
+                .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
             lock_file.path = path;
             lock_file
         } else {
             Self::empty(path)
         };
-        lock_file.generate(config, provider, false).await?;
+        lock_file.generate(config, provider, false, auth).await?;
         Ok(lock_file)
     }
 
-    pub async fn update(&mut self, config: &Config, provider: &impl Provider) -> Result<(), Error> {
-        self.generate(config, provider, true).await
+    pub async fn update(&mut self, config: &Config, provider: &impl Provider, auth: &context::Auth) -> Result<(), Error> {
+        self.generate(config, provider, true, auth).await
     }
 
-    async fn generate(&mut self, config: &Config, provider: &impl Provider, update: bool) -> Result<(), Error> {
+    async fn generate(
+        &mut self,
+        config: &Config,
+        provider: &impl Provider,
+        update: bool,
+        auth: &context::Auth,
+    ) -> Result<(), Error> {
         let pull = &config.pull;
         if pull.is_empty() {
             self.pull = HashMap::new();
@@ -63,14 +77,23 @@ impl LockFile {
             }
 
             let locked = if let Some(version) = &artifact.version {
-                let metadata = provider.fetch_artifact_version_metadata(&artifact.group, &artifact.artifact, version).await?;
+                let metadata = provider
+                    .fetch_artifact_version_metadata(
+                        &artifact.group,
+                        &artifact.artifact,
+                        version,
+                        auth,
+                    )
+                    .await?;
                 PullArtifactRef {
                     group: metadata.group_id,
                     artifact: metadata.id,
                     version: metadata.version,
                 }
             } else {
-                let metadata = provider.fetch_artifact_metadata(&artifact.group, &artifact.artifact).await?;
+                let metadata = provider
+                    .fetch_artifact_metadata(&artifact.group, &artifact.artifact, auth)
+                    .await?;
                 PullArtifactRef {
                     group: metadata.group_id,
                     artifact: metadata.id,
@@ -84,7 +107,6 @@ impl LockFile {
         for key in keys.difference(&pull_inserted) {
             self.pull.remove(key);
         }
-
 
         let mut file = File::create(&self.path).await?;
         let content = serde_json::to_vec_pretty(&self).expect("LockFile JSON render");

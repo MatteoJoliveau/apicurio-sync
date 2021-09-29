@@ -1,18 +1,41 @@
 use std::collections::HashMap;
+use std::fmt::{self, Display, Formatter};
 
 use async_trait::async_trait;
-
-use crate::error::Error;
-use std::fmt::{self, Display, Formatter};
 use serde::{Deserialize, Serialize};
+
+use crate::context;
+use crate::error::Error;
 
 #[async_trait]
 pub trait Provider {
-    async fn system_info(&self) -> Result<SystemInfo, Error>;
-    async fn fetch_artifact_metadata(&self, group_id: &str, artifact_id: &str) -> Result<ArtifactMetadata, Error>;
-    async fn fetch_artifact_version_metadata(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<ArtifactVersionMetadata, Error>;
-    async fn fetch_artifact_version(&self, group_id: &str, artifact_id: &str, version: &str) -> Result<Vec<u8>, Error>;
-    async fn push_artifact(&self, metadata: PushArtifactMetadata, content: Vec<u8>) -> Result<(), Error>;
+    async fn system_info(&self, auth: &context::Auth) -> Result<SystemInfo, Error>;
+    async fn fetch_artifact_metadata(
+        &self,
+        group_id: &str,
+        artifact_id: &str,
+        auth: &context::Auth,
+    ) -> Result<ArtifactMetadata, Error>;
+    async fn fetch_artifact_version_metadata(
+        &self,
+        group_id: &str,
+        artifact_id: &str,
+        version: &str,
+        auth: &context::Auth,
+    ) -> Result<ArtifactVersionMetadata, Error>;
+    async fn fetch_artifact_version(
+        &self,
+        group_id: &str,
+        artifact_id: &str,
+        version: &str,
+        auth: &context::Auth,
+    ) -> Result<Vec<u8>, Error>;
+    async fn push_artifact(
+        &self,
+        metadata: PushArtifactMetadata,
+        content: Vec<u8>,
+        auth: &context::Auth,
+    ) -> Result<(), Error>;
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -103,23 +126,45 @@ pub struct NoopProvider;
 
 #[async_trait]
 impl Provider for NoopProvider {
-    async fn system_info(&self) -> Result<SystemInfo, Error> {
+    async fn system_info(&self, _auth: &context::Auth) -> Result<SystemInfo, Error> {
         unimplemented!()
     }
 
-    async fn fetch_artifact_metadata(&self, _group_id: &str, _artifact_id: &str) -> Result<ArtifactMetadata, Error> {
+    async fn fetch_artifact_metadata(
+        &self,
+        _group_id: &str,
+        _artifact_id: &str,
+        _auth: &context::Auth,
+    ) -> Result<ArtifactMetadata, Error> {
         unimplemented!()
     }
 
-    async fn fetch_artifact_version_metadata(&self, _group_id: &str, _artifact_id: &str, _version: &str) -> Result<ArtifactVersionMetadata, Error> {
+    async fn fetch_artifact_version_metadata(
+        &self,
+        _group_id: &str,
+        _artifact_id: &str,
+        _version: &str,
+        _auth: &context::Auth,
+    ) -> Result<ArtifactVersionMetadata, Error> {
         unimplemented!()
     }
 
-    async fn fetch_artifact_version(&self, _group_id: &str, _artifact_id: &str, _version: &str) -> Result<Vec<u8>, Error> {
+    async fn fetch_artifact_version(
+        &self,
+        _group_id: &str,
+        _artifact_id: &str,
+        _version: &str,
+        _auth: &context::Auth,
+    ) -> Result<Vec<u8>, Error> {
         unimplemented!()
     }
 
-    async fn push_artifact(&self, _metadata: PushArtifactMetadata, _content: Vec<u8>) -> Result<(), Error> {
+    async fn push_artifact(
+        &self,
+        _metadata: PushArtifactMetadata,
+        _content: Vec<u8>,
+        _auth: &context::Auth,
+    ) -> Result<(), Error> {
         unimplemented!()
     }
 }
