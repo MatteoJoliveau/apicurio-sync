@@ -122,7 +122,7 @@ impl AuthProvider for OidcProvider {
             client_id: this.client_id.clone(),
             access_token: tokens.access_token.clone(),
             refresh_token: tokens.refresh_token.clone(),
-            expires_at: tokens.expires_at.clone(),
+            expires_at: tokens.expires_at,
         });
         Ok(ctx)
     }
