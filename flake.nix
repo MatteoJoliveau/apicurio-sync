@@ -1,7 +1,7 @@
 {
   inputs = {
     naersk.url = "github:nix-community/naersk/master";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "nixpkgs";
     utils.url = "github:numtide/flake-utils";
   };
 
@@ -12,13 +12,15 @@
         naersk-lib = pkgs.callPackage naersk { };
       in
       {
-        defaultPackage = naersk-lib.buildPackage ./.;
+        packages.apicurio-sync = naersk-lib.buildPackage ./.;
+        packages.default = self.packages.${system}.apicurio-sync;
 
-        defaultApp = utils.lib.mkApp {
-          drv = self.defaultPackage."${system}";
+        apps.default = utils.lib.mkApp {
+          name = "apicurio-sync";
+          drv = self.packages.${system}.default;
         };
 
-        devShell = with pkgs; mkShell {
+        devShells.default = with pkgs; mkShell {
           buildInputs = [ cargo rustc rustfmt pre-commit rustPackages.clippy ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
         };
